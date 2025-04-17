@@ -24,12 +24,16 @@ public class CookiesIntegrationTest {
 
     @BeforeClass
     public static void initRoutes() throws InterruptedException {
-        post("/assertNoCookies", (request, response) -> {
+        // Define a common handler for empty cookie checks
+        Route assertNoCookiesHandler = (request, response) -> {
             if (!request.cookies().isEmpty()) {
                 halt(500);
             }
             return "";
-        });
+        };
+
+        post("/assertNoCookies", assertNoCookiesHandler);
+        post("/path/assertNoCookies", assertNoCookiesHandler);
 
         post("/setCookie", (request, response) -> {
             response.cookie(request.queryParams("cookieName"), request.queryParams("cookieValue"));
@@ -44,12 +48,18 @@ public class CookiesIntegrationTest {
             return "";
         });
 
-        post("/removeCookie", (request, response) -> {
+        // Define a common cookie validation function
+        Route assertAndRemoveCookie = (request, response) -> {
             String cookieName = request.queryParams("cookieName");
             String cookieValue = request.cookie(cookieName);
             if (!request.queryParams("cookieValue").equals(cookieValue)) {
                 halt(500);
             }
+            return cookieName;
+        };
+
+        post("/removeCookie", (request, response) -> {
+            String cookieName = (String) assertAndRemoveCookie.handle(request, response);
             response.removeCookie(cookieName);
             return "";
         });
@@ -59,25 +69,13 @@ public class CookiesIntegrationTest {
             String cookieValue = request.queryParams("cookieValue");
             response.cookie("/path", cookieName, cookieValue, -1, false);
             return "";
-        }) ;
-
-        post("/path/removeCookieWithPath", (request, response) -> {
-            String cookieName = request.queryParams("cookieName");
-            String cookieValue = request.cookie(cookieName);
-            if (!request.queryParams("cookieValue").equals(cookieValue)) {
-                halt(500);
-            }
-            response.removeCookie("/path", cookieName);
-            return "";
-        }) ;
-
-        post("/path/assertNoCookies", (request, response) -> {
-            if (!request.cookies().isEmpty()) {
-                halt(500);
-            }
-            return "";
         });
 
+        post("/path/removeCookieWithPath", (request, response) -> {
+            String cookieName = (String) assertAndRemoveCookie.handle(request, response);
+            response.removeCookie("/path", cookieName);
+            return "";
+        });
     }
 
     @AfterClass
